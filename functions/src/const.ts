@@ -1,0 +1,2 @@
+export const TRELLO_KEY = "28fadf49b8c4aff6b3747662fd6b0840";
+export const TRELLO_TOKEN = "ATTAab8a4d595e3050e4501da17072efa5141999acc067ed442bdd5cf9a76f1c9c9c702D3DB4";
