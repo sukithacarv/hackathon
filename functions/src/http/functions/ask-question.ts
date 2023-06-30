@@ -15,7 +15,7 @@ export const askQuestion = async (req: Request, res: Response) => {
     const model = new OpenAI({ openAIApiKey: OPENAI_API_KEY, modelName: "gpt-3.5-turbo-0613", temperature: 0 });
     const openAIEmbeddings = new OpenAIEmbeddings({ openAIApiKey: OPENAI_API_KEY });
 
-    const downloadResponse = await adminStorage().bucket().file(req.body.file).download();
+    const downloadResponse = await adminStorage().bucket().file(`${req.body.file}.srt`).download();
     logger.log("Buffer length: ", downloadResponse.toString());
 
     const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });

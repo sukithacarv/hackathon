@@ -28,7 +28,7 @@ export const chatAndCommandMeeting = async (req: Request, res: Response) => {
     const zapier = new ZapierNLAWrapper({ apiKey: ZAPIER_KEY });
     const toolkit = await ZapierToolKit.fromZapierNLAWrapper(zapier);
 
-    const downloadResponse = await adminStorage().bucket().file(req.body.file).download();
+    const downloadResponse = await adminStorage().bucket().file(`${req.body.file}.srt`).download();
     logger.log("Buffer length: ", downloadResponse.toString());
 
     const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });

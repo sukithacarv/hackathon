@@ -12,7 +12,7 @@ import fetch from 'node-fetch';
 import { runWith } from 'firebase-functions';
 
 
-export const onFinalize = runWith({secrets: ['OPENAI_API_KEY', 'PINECONE_API_KEY', 'TRELLO_KEY', 'TRELLO_TOKEN']}).storage.object().onFinalize(async (object) => {
+export const onFinalize = runWith({ secrets: ['OPENAI_API_KEY', 'PINECONE_API_KEY', 'TRELLO_KEY', 'TRELLO_TOKEN'] }).storage.object().onFinalize(async (object) => {
     logger.log("INIT: onFinalize", object);
 
     const fileBucket = object.bucket; // Storage bucket containing the file.
@@ -33,55 +33,60 @@ export const onFinalize = runWith({secrets: ['OPENAI_API_KEY', 'PINECONE_API_KEY
     if (fileBucket && filePath) {
         try {
             //ToDo check for srt
-            const downloadResponse = await adminStorage().bucket(fileBucket).file(filePath).download();
-            logger.log("Buffer length: ", downloadResponse.toString());
-            const loader = new TextLoader(new Blob(downloadResponse));
-            const docs = await loader.load();
-            const loadMeetingChain = loadQAStuffChain(model);
-            await client.init({
-                apiKey: PINECONE_API_KEY,
-                environment: PINECONE_ENVIRONMENT,
-            });
-            const pineconeIndex = client.Index(PINECONE_INDEX);
 
-            const response = await loadMeetingChain.call({
-                input_documents: docs,
-                question: "Extract tasks for each user",
-                outputKey: "task",
-            });
-            logger.log(JSON.stringify(response));
+            const fileArray = filePath.split(".");
+            if (fileArray.length > 0 && fileArray[1] === 'srt') {
+                const downloadResponse = await adminStorage().bucket(fileBucket).file(filePath).download();
+                logger.log("Buffer length: ", downloadResponse.toString());
+                const loader = new TextLoader(new Blob(downloadResponse));
+                const docs = await loader.load();
+                const loadMeetingChain = loadQAStuffChain(model);
+                await client.init({
+                    apiKey: PINECONE_API_KEY,
+                    environment: PINECONE_ENVIRONMENT,
+                });
+                const pineconeIndex = client.Index(PINECONE_INDEX);
 
+                const response = await loadMeetingChain.call({
+                    input_documents: docs,
+                    question: "Extract tasks for each user",
+                    outputKey: "task",
+                });
+                logger.log(JSON.stringify(response));
 
-            const createExtractionChain = createExtractionChainFromZod(
-                z.object({
-                    "person-name": z.string().optional(),
-                    "person-task": z.array(z.string()).optional(),
-                }),
-                model,
-            );
+                const createExtractionChain = createExtractionChainFromZod(
+                    z.object({
+                        "person-name": z.string().optional(),
+                        "person-task": z.array(z.string()).optional(),
+                    }),
+                    model,
+                );
 
-            const extractionResponse: any = await createExtractionChain.run(response.text)
-            logger.log(JSON.stringify(extractionResponse));
+                const extractionResponse: any = await createExtractionChain.run(response.text)
+                logger.log(JSON.stringify(extractionResponse));
 
-            const pineconeStore = await PineconeStore.fromExistingIndex(openAIEmbeddings, {
-                pineconeIndex,
-            });
+                const pineconeStore = await PineconeStore.fromExistingIndex(openAIEmbeddings, {
+                    pineconeIndex,
+                });
 
-            for (const user of extractionResponse) {
-                for (const task of user['person-task']) {
-                    const resultOne = await pineconeStore.similaritySearchWithScore(task, 1);
-                    const firstRecord = resultOne[0];
-                    if (firstRecord[1] > 0.8) {
-                        const trelloId = firstRecord[0].metadata.id;
-                        logger.log(`${user['person-name']}, ${task}, ${firstRecord[0].pageContent} ${firstRecord[1]} \n`);
-                        const comment = `${user['person-name']}, ${task}`;
-                        const params = new URLSearchParams({ text: comment, key: TRELLO_KEY, token: TRELLO_TOKEN });
-                        const url = `https://api.trello.com/1/cards/${trelloId}/actions/comments?` + params;
-                        logger.log(`Trello URL is ${url}`);
-                        const res = await fetch(url, { method: 'post', });
-                        logger.log(`Trello Response : `,res);
+                for (const user of extractionResponse) {
+                    for (const task of user['person-task']) {
+                        const resultOne = await pineconeStore.similaritySearchWithScore(task, 1);
+                        const firstRecord = resultOne[0];
+                        if (firstRecord[1] > 0.8) {
+                            const trelloId = firstRecord[0].metadata.id;
+                            logger.log(`${user['person-name']}, ${task}, ${firstRecord[0].pageContent} ${firstRecord[1]} \n`);
+                            const comment = `${user['person-name']}, ${task}`;
+                            const params = new URLSearchParams({ text: comment, key: TRELLO_KEY, token: TRELLO_TOKEN });
+                            const url = `https://api.trello.com/1/cards/${trelloId}/actions/comments?` + params;
+                            logger.log(`Trello URL is ${url}`);
+                            const res = await fetch(url, { method: 'post', });
+                            logger.log(`Trello Response : `, res);
+                        }
                     }
                 }
+            }else{
+                logger.log(`File details : `, fileArray);
             }
 
         } catch (error) {
