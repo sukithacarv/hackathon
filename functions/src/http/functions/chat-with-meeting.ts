@@ -45,7 +45,7 @@ export const chatMeeting = async (req: Request, res: Response) => {
             sessionId: req.body.sessionId,  // change this
             sessionTTL: 3600,
             config: {
-                url: `redis://default:${REDIS_PASSWORD}@r${REDIS_ENDPOINT}`,
+                url: `redis://default:${REDIS_PASSWORD}@${REDIS_ENDPOINT}`,
             },
         }),
     });
